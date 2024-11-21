@@ -1,0 +1,9 @@
+[submodule "pitot_logger"]
+	path = pitot_logger
+	url = https://github.com/polimi-saslab/pitot_logger.git
+[submodule "px4_msgs"]
+	path = px4_msgs
+	url = https://github.com/PX4/px4_msgs.git
+[submodule "px4_ros_com"]
+	path = px4_ros_com
+	url = https://github.com/PX4/px4_ros_com.git
