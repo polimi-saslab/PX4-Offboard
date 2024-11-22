@@ -14,7 +14,6 @@ find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(px4_msgs REQUIRED)
-find_package(interfaces REQUIRED)
 
 add_executable(odom_broadcaster src/odom_broadcaster.cpp)
 add_executable(px4_ros_bridge src/px4_ros_bridge.cpp)
@@ -32,7 +31,6 @@ set(my_dep
   "tf2_ros"
   "tf2_geometry_msgs"
   "px4_msgs"
-  "interfaces"
 )
 
 ament_target_dependencies(odom_broadcaster PUBLIC ${my_dep})

@@ -5,7 +5,6 @@
 #include <px4_msgs/msg/vehicle_land_detected.hpp>
 #include <px4_msgs/msg/vehicle_status.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
-#include "interfaces/srv/set_mapping_status.hpp"
 #include <rclcpp/rclcpp.hpp>
 #include <stdint.h>
 
@@ -97,10 +96,6 @@ public:
 			// if armed and flying, publish setpoint
 			if (armed_ && flying_) {
 				if (!mapping_enabled_) {
-					// call gbeam service to enable mapping
-                	auto request = std::make_shared<interfaces::srv::SetMappingStatus::Request>();
-                	request->request = true;
-					// TODO: add verification of service call success
             	}
             	publish_trajectory_setpoint();
         	}
@@ -129,8 +124,6 @@ private:
 	rclcpp::Publisher<OffboardControlMode>::SharedPtr offboard_control_mode_publisher_;
 	rclcpp::Publisher<TrajectorySetpoint>::SharedPtr trajectory_setpoint_publisher_;
 	rclcpp::Publisher<VehicleCommand>::SharedPtr vehicle_command_publisher_;
-
-	rclcpp::Client<interfaces::srv::SetMappingStatus>::SharedPtr set_mapping_status_client_;
 
 	rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_subscriber_;
     rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr vehicle_land_detected_subscriber_;
