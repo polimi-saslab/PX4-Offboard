@@ -10,3 +10,6 @@
 [submodule "sllidar_ros2"]
 	path = sllidar_ros2
 	url = https://github.com/Slamtec/sllidar_ros2.git
+[submodule "rplidar_ros2"]
+	path = rplidar_ros2
+	url = https://github.com/polimi-saslab/rplidar_ros2
