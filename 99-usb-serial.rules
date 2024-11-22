@@ -7,4 +7,4 @@ SUBSYSTEM=="tty", ATTRS{idVendor}=="2886", ATTRS{serial}=="744DBD817A3C", SYMLIN
 
 ## Lidars
 # Slamtec RP-Lidars
-KERNEL=="ttyUSB*", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE:="0777", SYMLINK+="RPlidar_1"
+KERNEL=="ttyUSB*", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE:="0777", SYMLINK+="RPlidar"
