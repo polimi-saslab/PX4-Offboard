@@ -1,6 +1,7 @@
 ## USB to UART converters
 # Holybro type-C to Pixhawk connectors
 SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{serial}=="D30DITUN", SYMLINK+="pix_UART_1"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{serial}=="D30JJ49L", SYMLINK+="pix_UART_2"
 
 ## Multi-directional pitot pipes, chronic technologies
 SUBSYSTEM=="tty", ATTRS{idVendor}=="2886", ATTRS{serial}=="744DBD817A3C", SYMLINK+="pitot_1"
