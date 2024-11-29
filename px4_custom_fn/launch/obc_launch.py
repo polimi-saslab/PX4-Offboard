@@ -13,7 +13,7 @@ def generate_launch_description():
             FindExecutable(name='MicroXRCEAgent'),
             'serial',
             '--dev',
-            '/dev/' + 'pix_UART_1',
+            '/dev/' + 'pix_UART_2',
             '-b',
             '921600'
         ],

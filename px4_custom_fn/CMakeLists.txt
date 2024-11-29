@@ -14,9 +14,11 @@ find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(px4_msgs REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system filesystem)
 
 add_executable(odom_broadcaster src/odom_broadcaster.cpp)
 add_executable(px4_ros_bridge src/px4_ros_bridge.cpp)
+add_executable(telemetry_bag_recorder src/telemetry_bag_recorder.cpp)
 
 target_include_directories(odom_broadcaster PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -31,14 +33,17 @@ set(my_dep
   "tf2_ros"
   "tf2_geometry_msgs"
   "px4_msgs"
+  "Boost"
 )
 
 ament_target_dependencies(odom_broadcaster PUBLIC ${my_dep})
 ament_target_dependencies(px4_ros_bridge PUBLIC ${my_dep})
+ament_target_dependencies(telemetry_bag_recorder PUBLIC ${my_dep})
 
 install(TARGETS
   odom_broadcaster
   px4_ros_bridge
+  telemetry_bag_recorder
   DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch
