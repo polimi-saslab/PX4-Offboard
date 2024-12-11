@@ -31,6 +31,12 @@ def generate_launch_description():
         name='odom_broadcaster_node'
     )
 
+    bag_recorder_node = Node(
+        package='px4_ros_bridge',
+        executable='telemetry_bag_recorder',
+        name='telemetry_bag_recorder_node'
+    )
+
     rplidar_launch = IncludeLaunchDescription(
             PythonLaunchDescriptionSource([
                 PathJoinSubstitution([
@@ -50,6 +56,7 @@ def generate_launch_description():
         executable='static_transform_publisher',
         arguments=['0', '0.05', '0.045', '3.1415', '0', '0', 'vehicle', 'laser'],
         # x y z yaw pitch roll parent_frame child_frame
+        name='static_transforms_publisher_vehicle_laser',
         output='screen'
     )
 
@@ -63,5 +70,6 @@ def generate_launch_description():
         micro_XRCE_agent,
         odom_broadcaster_node,
         static_transforms_publisher,
-        rplidar_launch
+        rplidar_launch,
+        bag_recorder_node
     ])
