@@ -18,6 +18,7 @@ public:
     {
         rc_channels_sub_ = this->create_subscription<px4_msgs::msg::RcChannels>(
             "/fmu/out/rc_channels", 10, std::bind(&TelemetryBagRecorder::rcChannelsCallback, this, std::placeholders::_1));
+        bag_recording_ = false;
     }
 
     ~TelemetryBagRecorder()
