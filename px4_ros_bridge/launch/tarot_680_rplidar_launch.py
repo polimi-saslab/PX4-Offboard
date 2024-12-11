@@ -44,6 +44,14 @@ def generate_launch_description():
                 'frame_id': 'laser'
             }.items()
         )
+    
+    static_transforms_publisher = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=['0', '0.05', '0.045', '0', '0', '0', 'vehicle', 'laser'],
+        # x y z yaw pitch roll parent_frame child_frame
+        output='screen'
+    )
 
     return LaunchDescription([   
         DeclareLaunchArgument(
@@ -54,5 +62,6 @@ def generate_launch_description():
 
         micro_XRCE_agent,
         odom_broadcaster_node,
+        static_transforms_publisher,
         rplidar_launch
     ])
