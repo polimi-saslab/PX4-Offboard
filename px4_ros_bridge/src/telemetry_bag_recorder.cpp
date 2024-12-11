@@ -31,23 +31,23 @@ public:
 private:
     void rcChannelsCallback(const px4_msgs::msg::RcChannels::SharedPtr msg)
     {
-        if (debounce_timer_ == nullptr || debounce_timer_->is_canceled())
-        {
+        // if (debounce_timer_ == nullptr || debounce_timer_->is_canceled())
+        // {
             if (msg->channels[8] > 0.5 && !bag_recording_)
             {
-                start_bag_recording();
                 RCLCPP_INFO(this->get_logger(), "Starting bag recorder... ");
+                start_bag_recording();
             }
             else if (msg->channels[8] < 0.5 && bag_recording_)
             {
-                stop_bag_recording();
                 RCLCPP_INFO(this->get_logger(), "Stopping bag recorder... ");
+                stop_bag_recording();
             }
 
-            debounce_timer_ = this->create_wall_timer(debounce_duration_, [this]() {
-                debounce_timer_->cancel();
-            });
-        }
+        //     debounce_timer_ = this->create_wall_timer(debounce_duration_, [this]() {
+        //         debounce_timer_->cancel();
+        //     });
+        // }
     }
     void start_bag_recording()
     {
