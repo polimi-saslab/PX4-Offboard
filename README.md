@@ -62,11 +62,11 @@ This package contains all the necessary components for an Odroid used as an onbo
     ```
 2. Launch everything:
     ```bash
-        ros2 launch px4_custom_fn obc_launch.py
+        ros2 launch px4_ros_bridge obc_launch.py
     ```
 3. Optional: launch rviz to visualize.
     ```bash
-        rviz2 -d ~/onboard_ws/src/px4_custom_fn/px4_custom_fn/rviz/obc.rviz
+        rviz2 -d ~/onboard_ws/src/px4_ros_bridge/rviz/obc.rviz
     ```
 
 ## Support

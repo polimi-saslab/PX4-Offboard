@@ -26,7 +26,7 @@ def generate_launch_description():
     )
 
     odom_broadcaster_node = Node(
-        package='px4_custom_fn',
+        package='px4_ros_bridge',
         executable='odom_broadcaster',
         name='odom_broadcaster_node'
     )
