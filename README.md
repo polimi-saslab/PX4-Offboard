@@ -41,6 +41,9 @@ This package contains all the necessary components for an Odroid used as an onbo
         sudo make install
         sudo ldconfig /usr/local/lib/
         ```
+    3. Configure PX4 parameters:
+        - Basic one as guides: <!-- TODO -->
+        - UXRCE_DDS_SYNCT: Disabled (to solve the issue of only /fmu/in topics being published)
 
 
 4. Setup persistent names of the usb devices, you have two alternative options:
