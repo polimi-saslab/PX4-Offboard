@@ -48,7 +48,7 @@ def generate_launch_description():
     static_transforms_publisher = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        arguments=['0', '0.05', '0.045', '0', '0', '0', 'vehicle', 'laser'],
+        arguments=['0', '0.05', '0.045', '0', '0', '180', 'vehicle', 'laser'],
         # x y z yaw pitch roll parent_frame child_frame
         output='screen'
     )
