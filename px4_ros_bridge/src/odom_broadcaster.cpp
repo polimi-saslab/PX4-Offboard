@@ -6,6 +6,7 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "px4_msgs/msg/vehicle_odometry.hpp"
 #include "tf2/LinearMath/Quaternion.h"
+#include "geometry_msgs/msg/twist_stamped.hpp"
 
 using std::placeholders::_1;
 
@@ -30,11 +31,8 @@ public:
     // Create the dynamic transform broadcaster
     tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
-    // Create the static transform broadcaster
-    // static_tf_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
-
-    // Broadcast the static transform
-    // broadcastStaticTransform();
+    // Create the vehicle velocity publisher
+    twist_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("tf_speed", 10);
   }
 
 private:
@@ -62,37 +60,27 @@ private:
    
     // Send the transform
     tf_broadcaster_->sendTransform(transform_stamped);
+
+    // Create a TwistStamped message
+    geometry_msgs::msg::TwistStamped twist_stamped;
+    // fill in the header
+    twist_stamped.header.stamp = this->get_clock()->now();
+    twist_stamped.header.frame_id = "vehicle";
+    // fill in the twist
+    twist_stamped.twist.linear.x = msg->velocity[0];
+    twist_stamped.twist.linear.y = msg->velocity[1];
+    twist_stamped.twist.linear.z = msg->velocity[2];
+    twist_stamped.twist.angular.x = msg->angular_velocity[0];
+    twist_stamped.twist.angular.y = msg->angular_velocity[1];
+    twist_stamped.twist.angular.z = msg->angular_velocity[2];
+    // publish the twist
+    twist_pub_->publish(twist_stamped);
   }
-
-  // void broadcastStaticTransform()
-  // {
-  //   geometry_msgs::msg::TransformStamped static_transform_stamped;
-
-  //   // Fill in the header
-  //   static_transform_stamped.header.stamp = this->get_clock()->now();
-  //   static_transform_stamped.header.frame_id = "vehicle";
-
-  //   // Set the child frame
-  //   static_transform_stamped.child_frame_id = "x500_lidar_0/link/lidar_2d_v2";
-
-  //   // Set the translation
-  //   static_transform_stamped.transform.translation.x = 0.0;
-  //   static_transform_stamped.transform.translation.y = 0.0;
-  //   static_transform_stamped.transform.translation.z = 0.1;  // 10 cm offset in Z direction
-
-  //   // Set the rotation (no rotation, so identity quaternion)
-  //   static_transform_stamped.transform.rotation.x = 0.0;
-  //   static_transform_stamped.transform.rotation.y = 0.0;
-  //   static_transform_stamped.transform.rotation.z = 0.0;
-  //   static_transform_stamped.transform.rotation.w = 1.0;
-
-  //   // Send the static transform
-  //   static_tf_broadcaster_->sendTransform(static_transform_stamped);
-  // }
 
   rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr subscription_;
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
-  // std::shared_ptr<tf2_ros::StaticTransformBroadcaster> static_tf_broadcaster_;
+  
+  rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr twist_pub_;
 };
 
 int main(int argc, char *argv[])
