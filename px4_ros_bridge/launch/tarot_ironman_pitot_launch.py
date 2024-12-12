@@ -29,6 +29,18 @@ def generate_launch_description():
         name='odom_broadcaster_node'
     )
 
+    rigid_twist_calculator_node = Node(
+        package='px4_ros_bridge',
+        executable='rigid_twist_calculator',
+        name='rigid_twist_calculator_node',
+        parameters=[{
+            'origin_frame': 'vehicle',
+            'target_frame': 'pitot_1',
+            'origin_twist_topic': 'vehicle_speed',
+            'target_twist_topic': 'pitot_1/sensor_speed'
+        }]
+    )
+
     bag_recorder_node = Node(
         package='px4_ros_bridge',
         executable='telemetry_bag_recorder',
@@ -62,7 +74,7 @@ def generate_launch_description():
     static_transform_publisher_pitot1 = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        arguments=['0.21', '-0.03', '0.47', '3.1415', '0', '0', 'vehicle', 'pitot_1'],
+        arguments=['0.06', '-0.03', '0.47', '3.1415', '0', '0', 'vehicle', 'pitot_1'],
         # x y z yaw pitch roll parent_frame child_frame
         name='static_transforms_publisher_vehicle_pitot_1',
         output='screen'
@@ -85,9 +97,10 @@ def generate_launch_description():
         ),
         micro_XRCE_agent,
         odom_broadcaster_node,
+        rigid_twist_calculator_node,
         bag_recorder_node,
         pitot_1_node,
-        pitot_2_node,
+        # pitot_2_node,
         static_transform_publisher_pitot1,
         # static_transform_publisher_pitot2
     ])

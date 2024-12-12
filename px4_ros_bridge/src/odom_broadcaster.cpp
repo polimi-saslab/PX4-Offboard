@@ -32,7 +32,7 @@ public:
     tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
     // Create the vehicle velocity publisher
-    twist_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("tf_speed", 10);
+    twist_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>("vehicle_speed", 10);
   }
 
 private:
