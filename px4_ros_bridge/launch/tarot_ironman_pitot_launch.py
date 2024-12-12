@@ -42,9 +42,9 @@ def generate_launch_description():
     pitot_1_node = Node(
         package='pitot_logger',
         executable='pitot_ros_bridge',
-        name='pitot_ros_bridge_node',
+        name='pitot_1_ros_bridge_node',
         parameters=[{
-            'frame_id': 'vehicle',
+            'frame_id': 'pitot_1',
             'device_name': 'pitot_1'
         }]
     )
@@ -52,9 +52,9 @@ def generate_launch_description():
     pitot_2_node = Node(
         package='pitot_logger',
         executable='pitot_ros_bridge',
-        name='pitot_ros_bridge_node',
+        name='pitot_2_ros_bridge_node',
         parameters=[{
-            'frame_id': 'vehicle',
+            'frame_id': 'pitot_2',
             'device_name': 'pitot_2'
         }]
     )
@@ -62,18 +62,18 @@ def generate_launch_description():
     static_transform_publisher_pitot1 = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        arguments=['0.21', '-0.03', '0.47', '3.1415', '0', '0', 'vehicle', 'pitot1'],
+        arguments=['0.21', '-0.03', '0.47', '3.1415', '0', '0', 'vehicle', 'pitot_1'],
         # x y z yaw pitch roll parent_frame child_frame
-        name='static_transforms_publisher_vehicle_pitot1',
+        name='static_transforms_publisher_vehicle_pitot_1',
         output='screen'
 )   
 
     static_transform_publisher_pitot2 = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        arguments=['0', '0.05', '0.045', '0', '0', '0', 'vehicle', 'pitot2'],
+        arguments=['0', '0.05', '0.045', '0', '0', '0', 'vehicle', 'pitot_2'],
         # x y z yaw pitch roll parent_frame child_frame
-        name='static_transforms_publisher_vehicle_pitot2',
+        name='static_transforms_publisher_vehicle_pitot_2',
         output='screen'
     ) 
 
@@ -89,5 +89,5 @@ def generate_launch_description():
         pitot_1_node,
         pitot_2_node,
         static_transform_publisher_pitot1,
-        static_transform_publisher_pitot2
+        # static_transform_publisher_pitot2
     ])
