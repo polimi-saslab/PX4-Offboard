@@ -19,11 +19,25 @@ find_package(Boost REQUIRED COMPONENTS system filesystem)
 add_executable(odom_broadcaster src/odom_broadcaster.cpp)
 add_executable(px4_ros_bridge src/px4_ros_bridge.cpp)
 add_executable(telemetry_bag_recorder src/telemetry_bag_recorder.cpp)
+add_executable(rigid_twist_calculator src/rigid_twist_calculator.cpp)
 
 target_include_directories(odom_broadcaster PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
+target_include_directories(px4_ros_bridge PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_include_directories(telemetry_bag_recorder PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_include_directories(rigid_twist_calculator PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+
 target_compile_features(odom_broadcaster PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(px4_ros_bridge PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(telemetry_bag_recorder PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(rigid_twist_calculator PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
 set(my_dep
   "rclcpp"
@@ -39,11 +53,13 @@ set(my_dep
 ament_target_dependencies(odom_broadcaster PUBLIC ${my_dep})
 ament_target_dependencies(px4_ros_bridge PUBLIC ${my_dep})
 ament_target_dependencies(telemetry_bag_recorder PUBLIC ${my_dep})
+ament_target_dependencies(rigid_twist_calculator PUBLIC ${my_dep})
 
 install(TARGETS
   odom_broadcaster
   px4_ros_bridge
   telemetry_bag_recorder
+  rigid_twist_calculator
   DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch
