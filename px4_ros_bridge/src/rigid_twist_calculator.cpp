@@ -13,6 +13,10 @@
 #include "tf2_ros/buffer.h"
 #include "tf2/LinearMath/Quaternion.h"
 
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2/LinearMath/Vector3.h>
+#include <tf2/convert.h>
+
 using std::placeholders::_1;
 
 using namespace std::chrono_literals;
@@ -46,6 +50,44 @@ public:
     }
 
 private:
+    geometry_msgs::msg::Twist transformTwist(
+        const geometry_msgs::msg::Twist& twist, 
+        const std::string& source_frame, 
+        const std::string& target_frame,
+        tf2_ros::Buffer& tf_buffer) 
+    {
+        geometry_msgs::msg::Twist transformed_twist;
+        try {
+            // Lookup the transform
+            geometry_msgs::msg::TransformStamped transform =
+                tf_buffer.lookupTransform(target_frame, source_frame, tf2::TimePointZero);
+
+            // Convert transform rotation to a tf2 quaternion
+            tf2::Quaternion rotation;
+            tf2::convert(transform.transform.rotation, rotation);
+
+            // Convert linear velocity to a tf2 vector
+            tf2::Vector3 linear_velocity(twist.linear.x, twist.linear.y, twist.linear.z);
+            tf2::Vector3 transformed_linear_velocity = tf2::quatRotate(rotation, linear_velocity);
+
+            // Convert angular velocity to a tf2 vector
+            tf2::Vector3 angular_velocity(twist.angular.x, twist.angular.y, twist.angular.z);
+            tf2::Vector3 transformed_angular_velocity = tf2::quatRotate(rotation, angular_velocity);
+
+            // Fill the transformed Twist message
+            transformed_twist.linear.x = transformed_linear_velocity.x();
+            transformed_twist.linear.y = transformed_linear_velocity.y();
+            transformed_twist.linear.z = transformed_linear_velocity.z();
+
+            transformed_twist.angular.x = transformed_angular_velocity.x();
+            transformed_twist.angular.y = transformed_angular_velocity.y();
+            transformed_twist.angular.z = transformed_angular_velocity.z();
+        } catch (tf2::TransformException& ex) {
+            RCLCPP_WARN(rclcpp::get_logger("transform_twist"), "Transform failed: %s", ex.what());
+        }
+        return transformed_twist;
+    }
+
     void compute_speed(const geometry_msgs::msg::TwistStamped::SharedPtr msg)
     {
         geometry_msgs::msg::TransformStamped transform;
@@ -80,6 +122,9 @@ private:
         target_twist.angular.x = msg->twist.angular.x;
         target_twist.angular.y = msg->twist.angular.y;
         target_twist.angular.z = msg->twist.angular.z;
+
+        // Transform the twist to the target frame
+        target_twist = transformTwist(target_twist, origin_frame_, target_frame_, *tf_buffer_);
 
         target_twist_stamped.header.stamp = this->get_clock()->now();
         target_twist_stamped.header.frame_id = target_frame_;
