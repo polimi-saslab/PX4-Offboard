@@ -67,3 +67,15 @@
         ```
     9. Enable the service with `sudo systemctl enable send_ip.service` and start it with `sudo systemctl start send_ip.service`
 4. Optional: setup NTP server to synchronize time with the ground station <!-- TODO add guide -->
+5. Setup git:
+    1. Install git with `sudo apt install git`
+    2. Configure git with your name and email:
+        ```bash
+        git config --global user.name "Your Name"
+        git config --global user.email "your@email.com"
+    3. Configure credential helper to store credentials:
+        ```bash
+        git config --global credential.helper store
+        ```
+    4. Generate a new token from github.com: Settings -> Developer settings -> Personal access tokens -> Generate new token
+    5. Use the token as password when first using git to clone, push, or pull from a repository
