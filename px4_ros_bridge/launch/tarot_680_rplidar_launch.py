@@ -34,7 +34,11 @@ def generate_launch_description():
     bag_recorder_node = Node(
         package='px4_ros_bridge',
         executable='telemetry_bag_recorder',
-        name='telemetry_bag_recorder_node'
+        name='telemetry_bag_recorder_node',
+        parameters=[{
+            'platform_name': 'tarot_680',
+            'test_name': 'generic_test'
+        }],
     )
 
     rplidar_launch = IncludeLaunchDescription(
