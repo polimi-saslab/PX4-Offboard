@@ -64,6 +64,12 @@ def generate_launch_description():
         output='screen'
     )
 
+    px4_ros_bridge = Node(
+        package='px4_ros_bridge',
+        executable='px4_ros_bridge',
+        name='px4_ros_bridge_node'
+    )
+
     return LaunchDescription([   
         DeclareLaunchArgument(
             'xrce_serial_port',
@@ -75,5 +81,6 @@ def generate_launch_description():
         odom_broadcaster_node,
         static_transforms_publisher,
         rplidar_launch,
-        bag_recorder_node
+        bag_recorder_node,
+        px4_ros_bridge
     ])

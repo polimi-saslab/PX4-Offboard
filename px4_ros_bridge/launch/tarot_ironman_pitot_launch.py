@@ -78,7 +78,7 @@ def generate_launch_description():
         # x y z yaw pitch roll parent_frame child_frame
         name='static_transforms_publisher_vehicle_pitot_1',
         output='screen'
-)   
+    )   
 
     static_transform_publisher_pitot2 = Node(
         package='tf2_ros',
@@ -88,6 +88,12 @@ def generate_launch_description():
         name='static_transforms_publisher_vehicle_pitot_2',
         output='screen'
     ) 
+
+    px4_ros_bridge = Node(
+        package='px4_ros_bridge',
+        executable='px4_ros_bridge',
+        name='px4_ros_bridge_node'
+    )
 
     return LaunchDescription([   
         DeclareLaunchArgument(
@@ -102,5 +108,6 @@ def generate_launch_description():
         pitot_1_node,
         # pitot_2_node,
         static_transform_publisher_pitot1,
-        # static_transform_publisher_pitot2
+        # static_transform_publisher_pitot2,
+        px4_ros_bridge
     ])
