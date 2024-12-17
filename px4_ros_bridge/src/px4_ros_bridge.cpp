@@ -4,6 +4,7 @@
 #include <px4_msgs/msg/vehicle_control_mode.hpp>
 #include <px4_msgs/msg/vehicle_land_detected.hpp>
 #include <px4_msgs/msg/vehicle_status.hpp>
+#include <px4_msgs/msg/rc_channels.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <stdint.h>
@@ -18,30 +19,27 @@ using namespace px4_msgs::msg;
 class OffboardControl : public rclcpp::Node
 {
 public:
-	OffboardControl() : Node("px4_ros_bridge"), yaw_(0.0)
+	OffboardControl() : Node("px4_ros_bridge"),
+        debounce_timer_(nullptr),
+        debounce_duration_(std::chrono::milliseconds(100)),
+		setpoint_button_pressed_(false)
 	{
+		// Initialize the publishers
 		offboard_control_mode_publisher_ = this->create_publisher<OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
 		trajectory_setpoint_publisher_ = this->create_publisher<TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
 		vehicle_command_publisher_ = this->create_publisher<VehicleCommand>("/fmu/in/vehicle_command", 10);
 
+		// Initialize the subscribers
 		rclcpp::QoS qos_status(rclcpp::KeepLast(10));
 		qos_status.best_effort(); // reduce Quality of Service setting to align with vehicle status settings
 
+		// Subscribe to land detected to check if the drone is flying
 		vehicle_land_detected_subscriber_ = this->create_subscription<px4_msgs::msg::VehicleLandDetected>(
             "/fmu/out/vehicle_land_detected",
             qos_status,
             [this](px4_msgs::msg::VehicleLandDetected::SharedPtr msg) {
 				flying_ = !msg->landed;
 			}
-		);
-
-        pos_ref_subscriber_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-            "/gbeam/gbeam_pos_ref", 
-			1,
-			[this](const geometry_msgs::msg::PoseStamped::SharedPtr tar_pos_ptr){
-				//RCLCPP_INFO(this->get_logger(), "refCallback executed. Point received x: %f y: %f",tar_pos_ptr->pose.position.x, tar_pos_ptr->pose.position.y);
-				target_pos_ = *tar_pos_ptr;
-    		}
 		);
 
 		// Subscribe to vehicle status to check if the drone is ready to arm
@@ -54,19 +52,30 @@ public:
             }
         );
 
-		mapping_enabled_ = false;
+		// Subscribe to flight mode to check if the drone is in offboard mode
+		control_mode_subscriber_ = this->create_subscription<px4_msgs::msg::VehicleControlMode>(
+			"/fmu/out/vehicle_control_mode",
+			qos_status,
+			[this](px4_msgs::msg::VehicleControlMode::SharedPtr msg) {
+				flag_control_offboard_enabled_ = msg->flag_control_offboard_enabled;
+			}
+		);
+
+		// Subscribe to RC channels to get switches values
+		rc_channels_subscriber_ = this->create_subscription<px4_msgs::msg::RcChannels>(
+			"/fmu/out/rc_channels",
+			qos_status,
+			std::bind(&OffboardControl::rc_channels_callback, this, std::placeholders::_1)
+		);
+
 		position_homed_ = false;
 
 		auto timer_callback = [this]() -> void {
 			// offboard_control_mode needs to be paired with trajectory_setpoint
 			publish_offboard_control_mode();
 
-			// RCLCPP_INFO(this->get_logger(),"Armed: %d - Ready to arm: %d - Flying: %d - Mapping %d", armed_, ready_to_arm_, flying_, mapping_enabled_);
-			RCLCPP_INFO(this->get_logger(),"Setting home");
-			this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_HOME, 1, 0);
-
 			// when the vehicle is ready to arm, switch to offboard mode and arm
-			if (ready_to_arm_ && !flying_ && !armed_) {
+			if (ready_to_arm_ && !flying_ && !armed_){// && flag_control_offboard_enabled_) {
 				
 				if (!position_homed_) {
 					// Set home position
@@ -77,46 +86,51 @@ public:
 					// Set the vehicle to offboard mode
 					this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
 					// Arm the vehicle
-					this->arm();
+					publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
+					RCLCPP_INFO(this->get_logger(), "Arm command sent");
 				}
+				
+				step_counter_ = 0;
 			}
 
-			// if armed and not flying: takeoff
+			// if armed and not flying: takeoff to 1 meter
 			if (armed_ && !flying_) {
-				this->takeoff();
+				this->publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 1.0, 0.0});
 			}
 
-			// if armed and flying, but not mapping, publish (0,0) setpoint
-			if (armed_ && flying_ && !mapping_enabled_) {
-				target_pos_.pose.position.x = 0.0,
-				target_pos_.pose.position.y = 0.0;
-				publish_trajectory_setpoint();
-			}
 
-			// if armed and flying, publish setpoint
+			// if armed and flying, publish waypoints
 			if (armed_ && flying_) {
-				if (!mapping_enabled_) {
-            	}
-            	publish_trajectory_setpoint();
-        	}
-			
+				if (step_counter_ < 1)
+            		publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 2.0, 0.0});
+				else if (step_counter_ < 2)
+            		publish_trajectory_setpoint(std::vector<float>{5.0, 0.0, 2.0, 0.0});
+				else if (step_counter_ < 3)
+            		publish_trajectory_setpoint(std::vector<float>{5.0, 5.0, 2.0, 0.0});
+				else if (step_counter_ < 4)
+            		publish_trajectory_setpoint(std::vector<float>{0.0, 5.0, 2.0, 0.0});
+				else if (step_counter_ < 5)
+            		publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 2.0, 0.0});
+				else
+					publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 2.0, 0.0});
+        	}	
 		};
 		timer_ = this->create_wall_timer(200ms, timer_callback);
-
-		// DECLARATION OF PARAMETERS FROM YAML FILE
-        this-> declare_parameter<float>("navigation_altitude",3.0);
-        this-> declare_parameter<float>("angular_vel",0.0);
-
-        // Get parameter from yaml file
-        navigation_altitude = this->get_parameter("navigation_altitude").get_parameter_value().get<float>();
-        angular_vel = this->get_parameter("angular_vel").get_parameter_value().get<float>();
-
-		// RCLCPP_INFO(this->get_logger(),"1) navigation_altitude: %f", navigation_altitude);
 	}
+	
+	void rc_channels_callback(const px4_msgs::msg::RcChannels::SharedPtr msg) {
+		if (debounce_timer_ == nullptr || debounce_timer_->is_canceled()) {
+			if (msg->channels[9] > 0.5 && !setpoint_button_pressed_) {
+				// go to next step
+				setpoint_button_pressed_ = true;
+				step_counter_++;
+			}
+			else if (msg->channels[9] < 0.5 && setpoint_button_pressed_)
+				setpoint_button_pressed_ = false;
 
-	void arm();
-	void disarm();
-	void takeoff();
+			debounce_timer_ = this->create_wall_timer(debounce_duration_, [this]() {debounce_timer_->cancel();});
+		}
+	}
 
 private:
 	rclcpp::TimerBase::SharedPtr timer_;
@@ -127,45 +141,28 @@ private:
 
 	rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_subscriber_;
     rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr vehicle_land_detected_subscriber_;
-    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pos_ref_subscriber_;
+	rclcpp::Subscription<px4_msgs::msg::VehicleControlMode>::SharedPtr control_mode_subscriber_;
+	rclcpp::Subscription<px4_msgs::msg::RcChannels>::SharedPtr rc_channels_subscriber_;
 
 	std::atomic<uint64_t> timestamp_;   //!< common synced timestamped
+
+    rclcpp::TimerBase::SharedPtr debounce_timer_;
+    std::chrono::milliseconds debounce_duration_;
+
     geometry_msgs::msg::PoseStamped target_pos_;
-	bool flying_, ready_to_arm_, armed_, mapping_enabled_, position_homed_;
+	bool flying_, ready_to_arm_, armed_, position_homed_;
+	bool flag_control_offboard_enabled_;
 	float navigation_altitude;
 	float angular_vel;
 
-	float yaw_;
+	bool setpoint_button_pressed_;
+	float step_counter_;
 
 	void publish_offboard_control_mode();
-	void publish_trajectory_setpoint();
+	void publish_trajectory_setpoint(const std::vector<float> &target_pos);
 	void publish_vehicle_command(uint16_t command, float param1 = 0.0, float param2 = 0.0);
 };
 
-/**
- * @brief Send a command to Arm the vehicle
- */
-void OffboardControl::arm()
-{
-	publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
-
-	RCLCPP_INFO(this->get_logger(), "Arm command sent");
-}
-
-/**
- * @brief Send a command to Disarm the vehicle
- */
-void OffboardControl::disarm()
-{
-	publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 0.0);
-
-	RCLCPP_INFO(this->get_logger(), "Disarm command sent");
-}
-
-/**
- * @brief Publish the offboard control mode.
- *        For this example, only position and altitude controls are active.
- */
 void OffboardControl::publish_offboard_control_mode()
 {
 	OffboardControlMode msg{};
@@ -178,35 +175,26 @@ void OffboardControl::publish_offboard_control_mode()
 	offboard_control_mode_publisher_->publish(msg);
 }
 
-/**
- * @brief Publish a trajectory setpoint
- *        For this example, it sends a trajectory setpoint to make the
- *        vehicle hover at 5 meters with a yaw angle of 180 degrees.
- */
-void OffboardControl::publish_trajectory_setpoint()
+void OffboardControl::publish_trajectory_setpoint(const std::vector<float> &target_pos) // East North Up Yaw
 {
-
-	// RCLCPP_INFO(this->get_logger(), "GBEAM!");
+	if (target_pos.size() != 4) {
+		RCLCPP_ERROR(this->get_logger(), "Target position vector must have 4 elements: x (East), y (North), z (Up), yaw");
+		return;
+	}
 
 	TrajectorySetpoint msg{};
 	msg.position = {
-        static_cast<float>(target_pos_.pose.position.x),
-        static_cast<float>(target_pos_.pose.position.y),
-        static_cast<float>(-navigation_altitude)
-    };
+		static_cast<float>(-target_pos[1]),
+		static_cast<float>(target_pos[0]),
+		static_cast<float>(-target_pos[2])
+	};
 
-	//increment yaw value for continuous spinning
-	yaw_ += angular_vel*0.2;
-
-	if (yaw_ > M_PI) {
-		yaw_ -= 2 * M_PI; // keep yaw within [-PI, PI]
-	}
-
-	msg.yaw = yaw_; // [-PI:PI]
+	// Set yaw value
+	msg.yaw = target_pos[3];
 	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
 	trajectory_setpoint_publisher_->publish(msg);
 
-	// RCLCPP_INFO(this->get_logger(), "Yaw given: %f", yaw_);
+	RCLCPP_INFO(this->get_logger(), "Trajectory setpoint sent: %2.2f, %2.2f, %2.2f, %2.2f", target_pos[0], target_pos[1], target_pos[2], target_pos[3]);
 }
 
 /**
@@ -228,21 +216,6 @@ void OffboardControl::publish_vehicle_command(uint16_t command, float param1, fl
 	msg.from_external = true;
 	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
 	vehicle_command_publisher_->publish(msg);
-}
-
-void OffboardControl::takeoff()
-{
-	// RCLCPP_INFO(this->get_logger(), "Taking off!");
-
-	TrajectorySetpoint msg{};
-	msg.position = {
-        static_cast<float>(0.0),
-        static_cast<float>(0.0),
-        static_cast<float>(-navigation_altitude)
-    };
-	msg.yaw = 0.0; // [-PI:PI]
-	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
-	trajectory_setpoint_publisher_->publish(msg);
 }
 
 int main(int argc, char *argv[])
