@@ -20,9 +20,11 @@ class OffboardControl : public rclcpp::Node
 {
 public:
 	OffboardControl() : Node("px4_ros_bridge"),
-        debounce_timer_(nullptr),
+        debounce_timer_setpoint_(nullptr),
+		debounce_timer_offboard_(nullptr),
         debounce_duration_(std::chrono::milliseconds(100)),
-		setpoint_button_pressed_(false)
+		setpoint_button_pressed_(false),
+		offboard_switch_activated_(false)
 	{
 		// Initialize the publishers
 		offboard_control_mode_publisher_ = this->create_publisher<OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
@@ -71,55 +73,63 @@ public:
 		position_homed_ = false;
 
 		auto timer_callback = [this]() -> void {
-			// offboard_control_mode needs to be paired with trajectory_setpoint
-			publish_offboard_control_mode();
 
-			// when the vehicle is ready to arm, switch to offboard mode and arm
-			if (ready_to_arm_ && !flying_ && !armed_){// && flag_control_offboard_enabled_) {
-				
-				if (!position_homed_) {
-					// Set home position
-					this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_HOME, 1, 0);
-					position_homed_ = true;
+			if(flag_control_offboard_enabled_ && offboard_switch_activated_) {
+				// offboard_control_mode needs to be paired with trajectory_setpoint
+				publish_offboard_control_mode();
+
+				// when the vehicle is ready to arm, switch to offboard mode and arm
+				if (ready_to_arm_ && !flying_ && !armed_){
+					
+					if (!position_homed_) {
+						// Set home position
+						this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_HOME, 1, 0);
+						position_homed_ = true;
+					}
+					else {
+						// Set the vehicle to offboard mode
+						this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
+						// Arm the vehicle
+						publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
+						RCLCPP_INFO(this->get_logger(), "Arm command sent");
+					}
+					
+					step_counter_ = 0;
 				}
-				else {
-					// Set the vehicle to offboard mode
-					this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
-					// Arm the vehicle
-					publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
-					RCLCPP_INFO(this->get_logger(), "Arm command sent");
+
+				// if armed and not flying: takeoff to 1 meter
+				if (armed_ && !flying_) {
+					this->publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 1.0, 0.0});
 				}
-				
-				step_counter_ = 0;
+
+
+				// if armed and flying, publish waypoints
+				if (armed_ && flying_) {
+					if (step_counter_ < 1)
+						publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 2.0, 0.0});
+					else if (step_counter_ < 2)
+						publish_trajectory_setpoint(std::vector<float>{2.0, 0.0, 2.0, 0.0});
+					else if (step_counter_ < 3)
+						publish_trajectory_setpoint(std::vector<float>{2.0, 2.0, 2.0, 0.0});
+					else if (step_counter_ < 4)
+						publish_trajectory_setpoint(std::vector<float>{0.0, 2.0, 2.0, 0.0});
+					else if (step_counter_ < 5)
+						publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 2.0, 0.0});
+					else {
+						// Land the vehicle
+						this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_NAV_LAND, 0, 0);
+						RCLCPP_INFO(this->get_logger(), "Landing command sent");
+					}
+				}
 			}
-
-			// if armed and not flying: takeoff to 1 meter
-			if (armed_ && !flying_) {
-				this->publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 1.0, 0.0});
-			}
-
-
-			// if armed and flying, publish waypoints
-			if (armed_ && flying_) {
-				if (step_counter_ < 1)
-            		publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 2.0, 0.0});
-				else if (step_counter_ < 2)
-            		publish_trajectory_setpoint(std::vector<float>{5.0, 0.0, 2.0, 0.0});
-				else if (step_counter_ < 3)
-            		publish_trajectory_setpoint(std::vector<float>{5.0, 5.0, 2.0, 0.0});
-				else if (step_counter_ < 4)
-            		publish_trajectory_setpoint(std::vector<float>{0.0, 5.0, 2.0, 0.0});
-				else if (step_counter_ < 5)
-            		publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 2.0, 0.0});
-				else
-					publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 2.0, 0.0});
-        	}	
+			else
+				RCLCPP_INFO(this->get_logger(), "Waiting for offboard control mode");
 		};
 		timer_ = this->create_wall_timer(200ms, timer_callback);
 	}
 	
 	void rc_channels_callback(const px4_msgs::msg::RcChannels::SharedPtr msg) {
-		if (debounce_timer_ == nullptr || debounce_timer_->is_canceled()) {
+		if (debounce_timer_setpoint_ == nullptr || debounce_timer_setpoint_->is_canceled()) {
 			if (msg->channels[9] > 0.5 && !setpoint_button_pressed_) {
 				// go to next step
 				setpoint_button_pressed_ = true;
@@ -128,7 +138,18 @@ public:
 			else if (msg->channels[9] < 0.5 && setpoint_button_pressed_)
 				setpoint_button_pressed_ = false;
 
-			debounce_timer_ = this->create_wall_timer(debounce_duration_, [this]() {debounce_timer_->cancel();});
+			debounce_timer_setpoint_ = this->create_wall_timer(debounce_duration_, [this]() {debounce_timer_setpoint_->cancel();});
+		}
+		if (debounce_timer_offboard_ == nullptr || debounce_timer_offboard_->is_canceled()) {
+			if (msg->channels[10] > 0.5 && !offboard_switch_activated_) {
+				// go to next step
+				offboard_switch_activated_ = true;
+				step_counter_++;
+			}
+			else if (msg->channels[10] < 0.5 && offboard_switch_activated_)
+				offboard_switch_activated_ = false;
+
+			debounce_timer_offboard_ = this->create_wall_timer(debounce_duration_, [this]() {debounce_timer_offboard_->cancel();});
 		}
 	}
 
@@ -146,7 +167,7 @@ private:
 
 	std::atomic<uint64_t> timestamp_;   //!< common synced timestamped
 
-    rclcpp::TimerBase::SharedPtr debounce_timer_;
+    rclcpp::TimerBase::SharedPtr debounce_timer_setpoint_, debounce_timer_offboard_;
     std::chrono::milliseconds debounce_duration_;
 
     geometry_msgs::msg::PoseStamped target_pos_;
@@ -155,7 +176,7 @@ private:
 	float navigation_altitude;
 	float angular_vel;
 
-	bool setpoint_button_pressed_;
+	bool setpoint_button_pressed_, offboard_switch_activated_;
 	float step_counter_;
 
 	void publish_offboard_control_mode();
