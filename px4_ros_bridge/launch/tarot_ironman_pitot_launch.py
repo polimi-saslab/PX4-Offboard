@@ -26,7 +26,10 @@ def generate_launch_description():
     odom_broadcaster_node = Node(
         package='px4_ros_bridge',
         executable='odom_broadcaster',
-        name='odom_broadcaster_node'
+        name='odom_broadcaster_node',
+        parameters=[{
+            'use_sim_time': False
+        }]
     )
 
     rigid_twist_calculator_node = Node(
@@ -37,7 +40,8 @@ def generate_launch_description():
             'origin_frame': 'vehicle',
             'target_frame': 'pitot_1',
             'origin_twist_topic': 'vehicle_speed',
-            'target_twist_topic': 'pitot_1/sensor_speed'
+            'target_twist_topic': 'pitot_1/sensor_speed',
+            'use_sim_time': False
         }]
     )
 
@@ -47,7 +51,8 @@ def generate_launch_description():
         name='telemetry_bag_recorder_node',
         parameters=[{
             'platform_name': 'tarot_ironman',
-            'test_name': 'generic_test'
+            'test_name': 'generic_test',
+            'use_sim_time': False
         }]
     )
 
@@ -57,7 +62,8 @@ def generate_launch_description():
         name='pitot_1_ros_bridge_node',
         parameters=[{
             'frame_id': 'pitot_1',
-            'device_name': 'pitot_1'
+            'device_name': 'pitot_1',
+            'use_sim_time': False
         }]
     )
 
@@ -67,27 +73,38 @@ def generate_launch_description():
         name='pitot_2_ros_bridge_node',
         parameters=[{
             'frame_id': 'pitot_2',
-            'device_name': 'pitot_2'
+            'device_name': 'pitot_2',
+            'use_sim_time': False
         }]
     )
+
+    static_transform_publisher_odom_NED = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        # transform from ENU(odom) to NED
+        arguments=['0', '0', '0', '1.5708', '0', '3.1415', 'odom', 'odom_NED'],
+        # x y z yaw pitch roll parent_frame child_frame
+        name='static_transforms_publisher_odom_NED',
+        output='screen'
+    )   
 
     static_transform_publisher_pitot1 = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        arguments=['0.06', '-0.03', '0.47', '3.1415', '0', '0', 'vehicle', 'pitot_1'],
+        arguments=['0.06', '0.03', '-0.47', '0', '3.1415', '0', 'vehicle_FRD', 'pitot_1_FLU'],
         # x y z yaw pitch roll parent_frame child_frame
         name='static_transforms_publisher_vehicle_pitot_1',
         output='screen'
-    )   
+    )
 
     static_transform_publisher_pitot2 = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        arguments=['0', '0.05', '0.045', '0', '0', '0', 'vehicle', 'pitot_2'],
+        arguments=['0', '0.05', '0.045', '0', '0', '0', 'vehicle_FRD', 'pitot_2_FLU'],
         # x y z yaw pitch roll parent_frame child_frame
         name='static_transforms_publisher_vehicle_pitot_2',
         output='screen'
-    ) 
+    )
 
     px4_ros_bridge = Node(
         package='px4_ros_bridge',
@@ -107,6 +124,7 @@ def generate_launch_description():
         bag_recorder_node,
         pitot_1_node,
         # pitot_2_node,
+        static_transform_publisher_odom_NED,
         static_transform_publisher_pitot1,
         # static_transform_publisher_pitot2,
         px4_ros_bridge
