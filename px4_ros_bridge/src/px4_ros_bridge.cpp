@@ -1,6 +1,7 @@
 #include <px4_msgs/msg/offboard_control_mode.hpp>
 #include <px4_msgs/msg/trajectory_setpoint.hpp>
 #include <px4_msgs/msg/vehicle_command.hpp>
+#include <px4_msgs/msg/vehicle_command_ack.hpp>
 #include <px4_msgs/msg/vehicle_control_mode.hpp>
 #include <px4_msgs/msg/vehicle_land_detected.hpp>
 #include <px4_msgs/msg/vehicle_status.hpp>
@@ -32,8 +33,9 @@ public:
 		vehicle_command_publisher_ = this->create_publisher<VehicleCommand>("/fmu/in/vehicle_command", 10);
 
 		// Initialize the subscribers
-		rclcpp::QoS qos_status(rclcpp::KeepLast(10));
+		rclcpp::QoS qos_status(rclcpp::KeepLast(10)), qos_ack(rclcpp::KeepLast(10));
 		qos_status.best_effort(); // reduce Quality of Service setting to align with vehicle status settings
+		qos_ack.best_effort(); // reduce Quality of Service setting to align with vehicle command ack settings
 
 		// Subscribe to land detected to check if the drone is flying
 		vehicle_land_detected_subscriber_ = this->create_subscription<px4_msgs::msg::VehicleLandDetected>(
@@ -70,60 +72,142 @@ public:
 			std::bind(&OffboardControl::rc_channels_callback, this, std::placeholders::_1)
 		);
 
+		// Subscribe to vehicle command ack
+		vehicle_command_ack_subscriber_ = this->create_subscription<px4_msgs::msg::VehicleCommandAck>(
+			"/fmu/out/vehicle_command_ack",
+			qos_ack,
+			[this](px4_msgs::msg::VehicleCommandAck::SharedPtr msg) {
+				switch (status_) {
+					case STATUS_HOMING:
+						if (msg->result == VEHICLE_CMD_RESULT_ACCEPTED && msg->command == VehicleCommand::VEHICLE_CMD_DO_SET_HOME) {
+							RCLCPP_INFO(this->get_logger(), "Home position set - ack received");
+							position_homed_ = true;
+						}
+						break;
+					default:
+						if (msg->result == VEHICLE_CMD_RESULT_ACCEPTED) {
+							RCLCPP_INFO(this->get_logger(), "Vehicle command accepted");
+						} else if (msg->result == VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED) {
+							RCLCPP_INFO(this->get_logger(), "Vehicle command temporarily rejected");
+						} else if (msg->result == VEHICLE_CMD_RESULT_DENIED) {
+							RCLCPP_INFO(this->get_logger(), "Vehicle command denied");
+						} else if (msg->result == VEHICLE_CMD_RESULT_UNSUPPORTED) {
+							RCLCPP_INFO(this->get_logger(), "Vehicle command unsupported");
+						} else if (msg->result == VEHICLE_CMD_RESULT_FAILED) {
+							RCLCPP_INFO(this->get_logger(), "Vehicle command failed");
+						} else if (msg->result == VEHICLE_CMD_RESULT_IN_PROGRESS) {
+							RCLCPP_INFO(this->get_logger(), "Vehicle command in progress");
+						} else if (msg->result == VEHICLE_CMD_RESULT_CANCELLED) {
+							RCLCPP_INFO(this->get_logger(), "Vehicle command cancelled");
+						}
+						break;
+				}
+				
+			}
+		);
+
 		position_homed_ = false;
+		status_ = STATUS_IDLE;
 
 		auto timer_callback = [this]() -> void {
-
-			if(flag_control_offboard_enabled_ && offboard_switch_activated_) {
-				// offboard_control_mode needs to be paired with trajectory_setpoint
-				publish_offboard_control_mode();
-
-				// when the vehicle is ready to arm, switch to offboard mode and arm
-				if (ready_to_arm_ && !flying_ && !armed_){
-					
-					if (!position_homed_) {
-						// Set home position
-						this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_HOME, 1, 0);
-						position_homed_ = true;
-					}
-					else {
-						// Set the vehicle to offboard mode
-						this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
-						// Arm the vehicle
-						publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
-						RCLCPP_INFO(this->get_logger(), "Arm command sent");
-					}
-					
-					step_counter_ = 0;
-				}
-
-				// if armed and not flying: takeoff to 1 meter
-				if (armed_ && !flying_) {
-					this->publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 1.0, 0.0});
-				}
-
-
-				// if armed and flying, publish waypoints
-				if (armed_ && flying_) {
-					if (step_counter_ < 1)
-						publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 2.0, 0.0});
-					else if (step_counter_ < 2)
-						publish_trajectory_setpoint(std::vector<float>{2.0, 0.0, 2.0, 0.0});
-					else if (step_counter_ < 3)
-						publish_trajectory_setpoint(std::vector<float>{2.0, 2.0, 2.0, 0.0});
-					else if (step_counter_ < 4)
-						publish_trajectory_setpoint(std::vector<float>{0.0, 2.0, 2.0, 0.0});
-					else if (step_counter_ < 5)
-						publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 2.0, 0.0});
-					else {
-						// Land the vehicle
-						this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_NAV_LAND, 0, 0);
-						RCLCPP_INFO(this->get_logger(), "Landing command sent");
-					}
-				}
+			
+			// if offboard mode is not activated, set status to offboard deactivated
+			if (!offboard_switch_activated_) {
+				status_ = STATUS_OFFBOARD_DEACTIVATED;
 			}
-			else
-				RCLCPP_INFO(this->get_logger(), "Waiting for offboard control mode");
+			
+			// offboard_control_mode needs to be paired with trajectory_setpoint
+
+
+			switch (status_) {
+				case STATUS_OFFBOARD_DEACTIVATED:
+					if (flag_control_offboard_enabled_) {
+						status_ = STATUS_IDLE;
+					}
+					break;
+				case STATUS_IDLE:
+					if (ready_to_arm_ && !armed_ && !flying_) {
+						if (!position_homed_) {
+							status_ = STATUS_READY_TO_HOME;
+						} else {
+							status_ = STATUS_READY_TO_ARM;
+						}
+					} else if (ready_to_arm_ && armed_ && !flying_) {
+						status_ = STATUS_READY_TO_TAKEOFF;
+					} else if (ready_to_arm_ && armed_ && flying_) {
+						status_ = STATUS_HOLDING;
+					}
+					break;
+				case STATUS_READY_TO_HOME:
+					publish_offboard_control_mode();
+					// Send homing command
+					this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_HOME, 1, 0);
+					RCLCPP_INFO(this->get_logger(), "Homing command sent");
+					// change status and wait for ack
+					position_homed_ = false;
+					status_ = STATUS_HOMING;
+					break;
+				case STATUS_HOMING:
+					publish_offboard_control_mode();
+					if (position_homed_) {
+						status_ = STATUS_READY_TO_ARM;
+					}
+					break;
+				case STATUS_READY_TO_ARM:
+					publish_offboard_control_mode();
+					// Set the vehicle to offboard mode
+					this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
+					// Arm the vehicle
+					publish_vehicle_command(VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM, 1.0);
+					RCLCPP_INFO(this->get_logger(), "Arm command sent");
+					status_ = STATUS_ARMING;
+					break;
+				case STATUS_ARMING:
+					publish_offboard_control_mode();
+					if (armed_) {
+						RCLCPP_INFO(this->get_logger(), "Vehicle armed");
+						status_ = STATUS_READY_TO_TAKEOFF;
+					}
+					break;
+				case STATUS_READY_TO_TAKEOFF:
+					publish_offboard_control_mode();
+					this->publish_trajectory_setpoint(std::vector<float>{NAN, NAN, 2.0, 0.0});
+						RCLCPP_INFO(this->get_logger(), "Takeoff command sent");
+						status_ = STATUS_TAKINGOFF;
+					break;
+				case STATUS_TAKINGOFF:
+					publish_offboard_control_mode();
+					this->publish_trajectory_setpoint(std::vector<float>{NAN, NAN, 2.0, 0.0});
+					if (flying_) {
+						status_ = STATUS_HOLDING;
+					} 
+					break;
+				case STATUS_HOLDING:
+					publish_offboard_control_mode();
+					this->publish_trajectory_setpoint(std::vector<float>{NAN, NAN, 2.0, 0.0});
+					step_counter_ = 0;
+					status_ = STATUS_PARSING_WAYPOINTS;
+					break;
+				case STATUS_PARSING_WAYPOINTS:
+					publish_offboard_control_mode();
+					if (step_counter_ < 25)
+						publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 2.0, 0.0});
+					else if (step_counter_ < 50)
+						publish_trajectory_setpoint(std::vector<float>{5.0, 0.0, 2.0, 0.0});
+					else if (step_counter_ < 75)
+						publish_trajectory_setpoint(std::vector<float>{5.0, 5.0, 2.0, 0.0});
+					else if (step_counter_ < 100)
+						publish_trajectory_setpoint(std::vector<float>{0.0, 5.0, 2.0, 0.0});
+					else if (step_counter_ < 125)
+						publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 2.0, 0.0});
+					else
+						publish_trajectory_setpoint(std::vector<float>{0.0, 0.0, 2.0, 0.0});
+					step_counter_++;
+					break;
+				default:
+					status_ = STATUS_IDLE;
+					break;
+			}			
 		};
 		timer_ = this->create_wall_timer(200ms, timer_callback);
 	}
@@ -163,6 +247,7 @@ private:
 	rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_subscriber_;
     rclcpp::Subscription<px4_msgs::msg::VehicleLandDetected>::SharedPtr vehicle_land_detected_subscriber_;
 	rclcpp::Subscription<px4_msgs::msg::VehicleControlMode>::SharedPtr control_mode_subscriber_;
+	rclcpp::Subscription<px4_msgs::msg::VehicleCommandAck>::SharedPtr vehicle_command_ack_subscriber_;
 	rclcpp::Subscription<px4_msgs::msg::RcChannels>::SharedPtr rc_channels_subscriber_;
 
 	std::atomic<uint64_t> timestamp_;   //!< common synced timestamped
@@ -171,6 +256,8 @@ private:
     std::chrono::milliseconds debounce_duration_;
 
     geometry_msgs::msg::PoseStamped target_pos_;
+
+	uint8_t status_;
 	bool flying_, ready_to_arm_, armed_, position_homed_;
 	bool flag_control_offboard_enabled_;
 	float navigation_altitude;
@@ -182,6 +269,32 @@ private:
 	void publish_offboard_control_mode();
 	void publish_trajectory_setpoint(const std::vector<float> &target_pos);
 	void publish_vehicle_command(uint16_t command, float param1 = 0.0, float param2 = 0.0);
+
+	static constexpr uint8_t STATUS_IDLE = 00;
+	static constexpr uint8_t STATUS_OFFBOARD_DEACTIVATED = 01;
+	static constexpr uint8_t STATUS_READY_TO_HOME = 10;
+	static constexpr uint8_t STATUS_HOMING = 11;
+	static constexpr uint8_t STATUS_READY_TO_ARM = 20;
+	static constexpr uint8_t STATUS_ARMING = 21;
+	static constexpr uint8_t STATUS_READY_TO_TAKEOFF= 30;
+	static constexpr uint8_t STATUS_TAKINGOFF = 31;
+	static constexpr uint8_t STATUS_HOLDING = 40;
+	static constexpr uint8_t STATUS_PARSING_WAYPOINTS = 41;
+
+	static constexpr uint8_t VEHICLE_CMD_RESULT_ACCEPTED = 0;
+	static constexpr uint8_t VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED = 1;
+	static constexpr uint8_t VEHICLE_CMD_RESULT_DENIED = 2;
+	static constexpr uint8_t VEHICLE_CMD_RESULT_UNSUPPORTED = 3;
+	static constexpr uint8_t VEHICLE_CMD_RESULT_FAILED = 4;
+	static constexpr uint8_t VEHICLE_CMD_RESULT_IN_PROGRESS = 5;
+	static constexpr uint8_t VEHICLE_CMD_RESULT_CANCELLED = 6;
+
+	static constexpr uint16_t ARM_AUTH_DENIED_REASON_GENERIC = 0;
+	static constexpr uint16_t ARM_AUTH_DENIED_REASON_NONE = 1;
+	static constexpr uint16_t ARM_AUTH_DENIED_REASON_INVALID_WAYPOINT = 2;
+	static constexpr uint16_t ARM_AUTH_DENIED_REASON_TIMEOUT = 3;
+	static constexpr uint16_t ARM_AUTH_DENIED_REASON_AIRSPACE_IN_USE = 4;
+	static constexpr uint16_t ARM_AUTH_DENIED_REASON_BAD_WEATHER = 5;
 };
 
 void OffboardControl::publish_offboard_control_mode()
@@ -245,7 +358,6 @@ int main(int argc, char *argv[])
 	setvbuf(stdout, NULL, _IONBF, BUFSIZ);
 	rclcpp::init(argc, argv);
 	rclcpp::spin(std::make_shared<OffboardControl>());
-
 	rclcpp::shutdown();
 	return 0;
 }
