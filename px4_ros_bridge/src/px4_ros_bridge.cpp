@@ -122,11 +122,12 @@ public:
 			switch (status_) {
 				case STATUS_OFFBOARD_DEACTIVATED:
 					if (flag_control_offboard_enabled_) {
+						RCLCPP_INFO(this->get_logger(), "Offboard mode switch activated");
 						status_ = STATUS_IDLE;
 					}
 					break;
 				case STATUS_IDLE:
-					if (ready_to_arm_ && !armed_ && !flying_) {
+					if (ready_to_arm_ && !armed_) {
 						if (!position_homed_) {
 							status_ = STATUS_READY_TO_HOME;
 						} else {
@@ -136,7 +137,8 @@ public:
 						status_ = STATUS_READY_TO_TAKEOFF;
 					} else if (ready_to_arm_ && armed_ && flying_) {
 						status_ = STATUS_HOLDING;
-					}
+					} else
+						RCLCPP_INFO(this->get_logger(), "Waiting for vehicle to be ready to arm");
 					break;
 				case STATUS_READY_TO_HOME:
 					publish_offboard_control_mode();
