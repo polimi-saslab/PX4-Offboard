@@ -13,3 +13,6 @@
 [submodule "rplidar_ros"]
 	path = rplidar_ros
 	url = https://github.com/Slamtec/rplidar_ros.git
+[submodule "px4_ros_bridge"]
+	path = px4_ros_bridge
+	url = https://github.com/polimi-saslab/px4_ros_bridge.git
