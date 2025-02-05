@@ -27,7 +27,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: LaserScan
+    SyncSource: ""
 Visualization Manager:
   Class: ""
   Displays:
@@ -69,9 +69,11 @@ Visualization Manager:
         All Enabled: true
         laser:
           Value: true
-        odom:
+        odom_NED:
           Value: true
         vehicle:
+          Value: true
+        vehicle_FRD:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -79,10 +81,9 @@ Visualization Manager:
       Show Axes: true
       Show Names: false
       Tree:
-        odom:
-          vehicle:
-            laser:
-              {}
+        odom_NED:
+          vehicle_FRD:
+            {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -122,7 +123,7 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
-    Fixed Frame: odom
+    Fixed Frame: odom_NED
     Frame Rate: 30
   Name: root
   Tools:
@@ -165,25 +166,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 26.080493927001953
+      Distance: 1.8979061841964722
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -4.33271598815918
-        Y: -8.648584365844727
-        Z: 9.17916202545166
-      Focal Shape Fixed Size: true
+        X: 0
+        Y: 0
+        Z: 0
+      Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.0203979015350342
+      Pitch: 0.7853981852531433
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.7385735511779785
+      Yaw: 0.7853981852531433
     Saved: ~
 Window Geometry:
   Displays:
