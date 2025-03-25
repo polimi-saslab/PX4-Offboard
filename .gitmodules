@@ -16,6 +16,6 @@
 [submodule "px4_ros_bridge"]
 	path = px4_ros_bridge
 	url = https://github.com/polimi-saslab/px4_ros_bridge.git
-[submodule "lame-follower"]
-	path = lame-follower
-	url = https://github.com/polimi-saslab/lame-follower.git
+[submodule "gbeam"]
+	path = gbeam
+	url = https://github.com/polimi-saslab/gbeam.git
