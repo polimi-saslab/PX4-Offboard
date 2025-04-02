@@ -53,6 +53,16 @@ This package contains all the necessary components for an Odroid used as an onbo
         2. Reload the udev rules with `sudo udevadm control --reload-rules && sudo udevadm trigger`
         3. Optional: add new devices to the rules file, the information can be found with the command `udevadm info --name=/dev/ttyUSBx --attribute-walk` for the exemplaty device `/dev/ttyUSBx`
 
+5. Setup radio bridge:
+    - Copy the service file:
+        `sudo cp radio-bridge.service /etc/systemd/system/radio-bridge.service`
+    - Enable the service:
+        ```bash
+        sudo systemctl daemon-reload
+        sudo systemctl enable radio-bridge.service
+        sudo systemctl start radio-bridge.service
+        ```
+
 ## Usage
 
 1. Source the environment in all terminals
