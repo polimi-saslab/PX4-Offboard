@@ -19,3 +19,6 @@
 [submodule "gbeam"]
 	path = gbeam
 	url = https://github.com/polimi-saslab/gbeam.git
+[submodule "lame-follower"]
+	path = lame-follower
+	url = https://github.com/polimi-saslab/lame-follower.git
