@@ -22,3 +22,6 @@
 [submodule "lame-follower"]
 	path = lame-follower
 	url = https://github.com/polimi-saslab/lame-follower.git
+[submodule "airborne-wind-gp-mpc"]
+	path = airborne-wind-gp-mpc
+	url = https://gitlab.ethz.ch/ics-group/students/siro-corsi/airborne-wind-gp-mpc.git
