@@ -5,7 +5,7 @@ Wants=network.target
 ConditionPathExists=/dev/USB_UART_1
 
 [Service]
-ExecStart=/usr/sbin/pppd -detach nocrtscts lock noauth passive persist holdoff 3 maxfail 0 local 10.0.0.1:10.0.0.2 /dev/USB_UART_1 115200
+ExecStart=/usr/sbin/pppd -detach nocrtscts lock noauth passive persist holdoff 3 maxfail 0 local 10.0.0.1:10.0.0.2 /dev/USB_UART_1 460800
 Restart=always
 RestartSec=5
 User=root
