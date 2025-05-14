@@ -9,11 +9,8 @@ alias cb_verbose='--event-handlers console_direct+ --cmake-args -DCMAKE_VERBOSE_
 
 # ROS2
 alias tolist='ros2 topic list'
-alias toecho='tos2 topic echo'
+alias toecho='ros2 topic echo'
 alias wsin='. install/setup.bash'
-
-# HITL ROS2
-alias hlaunch='ros2 launch px4_ros_bridge'
 
 # Directory navigation
 # List by size
