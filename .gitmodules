@@ -25,3 +25,10 @@
 [submodule "airborne-wind-gp-mpc"]
 	path = airborne-wind-gp-mpc
 	url = ./airborne-wind-gp-mpc/
+[submodule "tether_control"]
+	path = tether_control
+	url = https://github.com/polimi-saslab/tether_control.git
+	branch = main
+[submodule "px4_ros_com"]
+	path = px4_ros_com
+	url = https://github.com/PX4/px4_ros_com.git
