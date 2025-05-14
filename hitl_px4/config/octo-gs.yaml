@@ -1,0 +1,4 @@
+flight_supervisor:
+  ros__parameters:
+    platform_name: 'octo-tarot'   # used for bag recording
+    test_name: 'octo-gs-sync'
